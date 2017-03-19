@@ -1,0 +1,11 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/AnonymousTypes/obj/Debug
+/.vs/Lab05AndLab06/v14
+/DataLoader/bin/Debug
+/DataLoader/obj/Debug
+/LINQ/bin/Debug
+/LINQ/obj/Debug
+/packages/CsvHelper.2.13.5.0
