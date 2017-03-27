@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using LINQ.HelperMethods;
+using System;
 
 namespace LINQ
 {
@@ -14,14 +15,15 @@ namespace LINQ
         {
             // Query syntax
             var accidentsWithMoreThan100Fatalities =
-                (from accident in DataContext.AirCrashes
+                 from accident in DataContext.AirCrashes
                  where accident.Fatalities > 100
-                 select accident);
+                 select accident;
             LinqHelperMethods.WriteResult(accidentsWithMoreThan100Fatalities, "Accidents with more than 100 fatalities");
 
             // Lambda syntax
             var accidentsWithMoreThan100PeopleAboard = DataContext.AirCrashes
-                .Where(c => c.Aboard > 100);
+                .Where(crash => crash.Aboard > 100);
+
             LinqHelperMethods.WriteResult(accidentsWithMoreThan100PeopleAboard, "Now for something completely the same...");
 
             // Max
@@ -31,21 +33,32 @@ namespace LINQ
 
             // First & OrderBy
             var firstCrashWithSurvivors = DataContext.AirCrashes
-                .OrderBy(c => c.Date)
-                .First(c => c.Fatalities < c.Aboard);
+                .OrderBy(crash => crash.Date)
+                .First(crash => crash.Aboard > crash.Fatalities);
             LinqHelperMethods.WriteResult(firstCrashWithSurvivors, "First crash with survivors: ");
 
             // Select
-            var typesOfAircrafts = DataContext.Aircrafts.Select(a => a.AircraftType)
-                .OrderBy(t => t)
+            var typesOfAircrafts = DataContext.Aircrafts
+                .Select(a => a.AircraftType)
                 .Distinct();
             LinqHelperMethods.WriteResult(typesOfAircrafts, "Known aircraft types alphabetically: ");
 
             // GroupBy
             var crashesByYear = DataContext.AirCrashes
-                .GroupBy(c => c.Date.Year)
-                .Select(g => new { Year = g.Key, Crashes = g.Count() });
+                .GroupBy(crash => crash.Date.Year)
+                .Select(g => new { Year = g.Key, Crashes = g.ToList() });
             LinqHelperMethods.WriteResult(crashesByYear, "Number of crashes by year: ");
+
+            // Join
+            var crashesWithManufacturers = DataContext.AirCrashes
+                .Join(DataContext.Aircrafts,
+                    crash => crash.AircraftType,
+                    aircraft => aircraft.AircraftType,
+                    (crash, aircraft) => new { crash.Description, aircraft.Manufacturer});
+
+            // Agregate
+            var sumOfFatalities = DataContext.AirCrashes
+                .Aggregate(0, (sum, crash) => sum + crash.Fatalities);
 
             // Zip
             int[] numbers = { 1, 2, 3, 4, 6 };
