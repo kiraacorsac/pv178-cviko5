@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using DataLoader.Model;
 using LINQ.HelperMethods;
 
@@ -77,11 +75,9 @@ namespace LINQ
 
             // Zjistete celkovy pocet evidovanych obeti, nezapomente
             // vyloucit defaultni hodnoty (-1) z dotazu
-            var totalFatalitiesCount =
-                    DataContext.AirCrashes
-                        .Select(crash => crash.Fatalities)
-                        .Where(fatalityCount => fatalityCount != -1)
-                        .Sum();
+            var totalFatalitiesCount = DataContext.AirCrashes
+                        .Where(crash => crash.Fatalities > 0)
+                        .Sum(crash => crash.Fatalities);
 
             LinqHelperMethods.WriteResult(totalFatalitiesCount, "Total fatalities recorded");
 
@@ -89,8 +85,7 @@ namespace LINQ
 
             // najdete nejcetnejsi letadlo (typ s nejvice vyrobenymi kusy),
             // jehoz prvni let se uskutecnil mezi roky 1960 az 1990 vcetne
-            var mostCommonAircraft =
-                DataContext.Aircrafts
+            var mostCommonAircraft = DataContext.Aircrafts
                     .Where(aircraft =>
                         aircraft.FirstFlight != DateTime.MinValue &&
                         aircraft.FirstFlight.Year >= 1960 &&
@@ -103,9 +98,9 @@ namespace LINQ
 
 
 
-            // zjistete roky, kdy doslo k padu letadel na nasem uzemi (Czechoslovakia)
-            var airCrashesInCzechoslovakia =
-                DataContext.AirCrashes
+            // zjistete roky, kdy doslo k padu letadel na nasem uzemi (czechoslovakia), 
+            // zajistete, aby porovnani retezcu probehlo jako case - insensitive
+            var airCrashesInCzechoslovakia = DataContext.AirCrashes
                     .Where(crash => crash.Location.ToLower().Contains("czechoslovakia"))
                     .Select(crash => crash.Date.Year)
                     .ToList();
@@ -115,31 +110,29 @@ namespace LINQ
 
 
             // rozdelte udaje o leteckych katastrofach dle
-            // vyctoveho typu AirCrashClassification (viz popis)
-            var airCrashesClasification =
-                DataContext.AirCrashes
-                    .GroupBy((airCrash => LinqHelperMethods.ClassifyAircrash(airCrash.Fatalities)))
+            // vyctoveho typu AirCrashClassification (viz popis), 
+            // Tip: vyuzijte predpripravene extension metody ClassifyAircrash,
+            // kterou naleznete v LinqHelperMethods
+            var airCrashesClasification = DataContext.AirCrashes
+                    .GroupBy(airCrash => airCrash.Fatalities.ClassifyAircrash())
                     .ToList();
 
             LinqHelperMethods.WriteResult(airCrashesClasification, "Air crashes classification");
 
 
 
-            // vyberte vsechny letadla, jejiz let se uskutecnil v prestupnem roce
-            var firstFlightInLeapYear =
-                DataContext.Aircrafts
-                    .GroupBy((aircraft => DateTime.IsLeapYear(aircraft.FirstFlight.Year)))
+            // vyberte vsechny letadla, jejiz prvni let se uskutecnil v prestupnem roce
+            var firstFlightInLeapYear = DataContext.Aircrafts
+                    .GroupBy(aircraft => DateTime.IsLeapYear(aircraft.FirstFlight.Year))
                     .ToList();
 
             // lookup vs dictionary (immutability, KeyNotFoundException)
             LinqHelperMethods.WriteResult(firstFlightInLeapYear, "Aircrafts with first flight in leap year");
-
-
         }
 
         public static void Task03()
         {
-            // vypiste minimalnu hodnotu vyrobenych kusov z prvych 10 lietadiel, ktorych prvy let sa uskutocnil
+            // vypiste minimalnu pocet vyrobenych kusov z prvych 10 lietadiel, ktorych prvy let sa uskutocnil
             // od roku 1964
             var minUnitsBuiltOfFirst10AircraftsFrom1964 = DataContext.Aircrafts
                 .Where(c => c.FirstFlight.Year > 1964)
@@ -150,8 +143,8 @@ namespace LINQ
 
 
 
-            // zoradte nazvy firiem podla abecedy zostupne, nasledne vypiste typy prvych 10 lietadiel zoradenych
-            // podla abecedy vzostupne
+            // Nejdrive sestupne seradte nazvy vyrobcu letadel (Manufacturer), 
+            // nasledne vzestupne vypiste typ prvnich deseti letadel
             var aircraftCodesFrom10LastManufacturers = DataContext.Aircrafts
                 .OrderByDescending(c => c.Manufacturer)
                 .Take(10)
@@ -164,7 +157,8 @@ namespace LINQ
 
 
             // vypiste vsechny lokace, kde havarovalo nejake letadlo od vyrobce Boeing
-            var boeingAircrashLocations =
+            /*
+             var boeingAircrashLocations =
                 DataContext.Aircrafts
                     .Where(aircraft => aircraft.Manufacturer.Contains("Boeing"))
                     .GroupJoin(DataContext.AirCrashes,
@@ -173,9 +167,20 @@ namespace LINQ
                         (aircraft, crash) => new { aircraft.AircraftType, crash })
                     .SelectMany(aircraft => aircraft.crash)
                     .Select(airCrash => airCrash.Location)
+                    .ToList(); 
+             */
+
+
+            var boeingAircrashLocations = DataContext.Aircrafts
+                    .Where(aircraft => aircraft.Manufacturer.Contains("Boeing"))
+                    .Join(DataContext.AirCrashes,
+                        aircraft => aircraft.AircraftType,
+                        crash => crash.AircraftType,
+                        (aircraft, crash) => crash)
+                    .Select(airCrash => airCrash.Location)
                     .ToList();
 
-            LinqHelperMethods.WriteResult(boeingAircrashLocations, "Boeing aircrash locations");
+            LinqHelperMethods.WriteResult(boeingAircrashLocations, "Boeing aircrash locations2");
 
 
 
@@ -202,7 +207,7 @@ namespace LINQ
                     .Join(DataContext.Aircrafts,
                         crash => crash.AircraftType,
                         aircraft => aircraft.AircraftType,
-                        (crash, aircraft) => new { aircraft.Manufacturer })
+                        (crash, aircraft) => aircraft.Manufacturer)
                     .Distinct()
                     .ToList();
 
@@ -213,7 +218,6 @@ namespace LINQ
         {
             // vypiste plne nazvy leteckych spolecnosti, ktere 
             // pouzivaji alespon jedno z 5 nejbeznejsich letadel
-            // ne vsechny spolecnosti musi nutne 
             // (cili kterych je nejvice vyrobeno, vsechny typy
             // nemusi byt vyuzivany vsemi spolecnostmi)
             var carriersWithCommonAircrafts =
@@ -225,9 +229,9 @@ namespace LINQ
                     crash => crash.AircraftType,
                     (aircraft, crash) => new { crash.CarrierCode })
                 .Join(DataContext.Carriers,
-                    anonymousInstance => anonymousInstance.CarrierCode,
+                    anon => anon.CarrierCode,
                     carrier => carrier.Code,
-                    (anonymousInstance, carrier) => new { carrier.Name })
+                    (anon, carrier) => new { carrier.Name })
                 .Distinct()
                 .ToList();
 
@@ -247,27 +251,27 @@ namespace LINQ
                    crash => crash.AircraftType,
                    (aircraft, crash) => new { aircraft.AircraftType, crash.CarrierCode })
                .Join(DataContext.Carriers,
-                   anonymousInstance => anonymousInstance.CarrierCode,
+                   anon => anon.CarrierCode,
                    carrier => carrier.Code,
-                   (anonymousInstance, carrier) => new { anonymousInstance.AircraftType, carrier.Name })
+                   (anon, carrier) => new { anon.AircraftType, carrier.Name })
                .ToList();
 
             LinqHelperMethods.WriteResult(carriersAndCommonAircrafts, "Carriers and 5 common aircrafts ");
 
 
 
-            // zjistete kolik procent lidi prezilo v ramci evidovanych dat
+            // zjistete kolik procent lidi prezilo v ramci evidovanych dat, v dotazu pouzijte klauzuli Aggregate(...)
             var aggregatedAirCrash =
                     DataContext.AirCrashes
-                        .Where(crash => crash.Fatalities != -1 && crash.Aboard != -1)
+                        .Where(crash => crash.Fatalities > 0 && crash.Aboard > 0)
                         .Aggregate((crash1, crash2) =>
-                           new AirCrash()
+                           new AirCrash
                            {
                                Aboard = crash1.Aboard + crash2.Aboard,
                                Fatalities = crash1.Fatalities + crash2.Fatalities
                            });
             var survivalPercentage =
-                (1.0 - (aggregatedAirCrash.Fatalities / (double)aggregatedAirCrash.Aboard)) * 100;
+                (1.0 - aggregatedAirCrash.Fatalities / (double)aggregatedAirCrash.Aboard) * 100;
 
             LinqHelperMethods.WriteResult(survivalPercentage, "Survival percentage is ");
 
@@ -275,15 +279,17 @@ namespace LINQ
 
             // naleznete letecke nehody pro 5 nejcastejsich
             // typu letadel (dle poctu vyrobenych kusu)
-            var airCrashesAccordingTo5CommonAircraftTypes =
-                DataContext.Aircrafts
-                    .OrderByDescending(aircraft => aircraft.UnitsBuilt)
-                    .Take(5)
-                    .GroupJoin(DataContext.AirCrashes,
-                        aircraft => aircraft.AircraftType,
-                        crash => crash.AircraftType,
-                        (aircraft, crash) => new { aircraft.AircraftType, crash })
-                    .ToDictionary(pair => pair.AircraftType, pair => pair.crash.ToList());
+            // vysledek ulozte do lookupu kde:
+            //   klic je typ letadla
+            //   hodnotou je list leteckych nehod
+            var airCrashesAccordingTo5CommonAircraftTypes = DataContext.Aircrafts
+                .OrderByDescending(aircraft => aircraft.UnitsBuilt)
+                .Take(5)
+                .GroupJoin(DataContext.AirCrashes,
+                    aircraft => aircraft.AircraftType,
+                    crash => crash.AircraftType,
+                    (aircraft, crashes) => new { aircraft.AircraftType, crashes })
+                .ToLookup(anon => anon.AircraftType, anon => anon.crashes);
 
             LinqHelperMethods.WriteResult(airCrashesAccordingTo5CommonAircraftTypes, "Air crashes according To 5 common aircraft types");
         }
@@ -293,77 +299,53 @@ namespace LINQ
             // pro kazdy typ letadla (v leteckych nehodach) spocitejte
             // celkovy pocet obeti, vysledek ulozte do vhodne datove 
             // struktury, seradte dle poctu obeti a vypiste prvnich
-            // 50 typu letadel a celkovy pocet obeti
-            var fatalitiesPerAircraftType = new Dictionary<string, int>();
-            var planeTypes =
-                DataContext.AirCrashes
-                    .Select(aircraft => aircraft.AircraftType)
-                    .Distinct()
-                    .ToList();
+            // 5 typu letadel a celkovy pocet obeti, nezapomente pak 
+            // vyloucit pripady, kdy u dane letecke nehody neni znam 
+            // typ letadla
+            var worst5 = DataContext.AirCrashes
+                .Where(crash => !string.IsNullOrWhiteSpace(crash.AircraftType))
+                .GroupBy(crash => crash.AircraftType, crash => crash.Fatalities)
+                .Select(group => new { AircraftType = group.Key, FatalitiesCount = group.Sum() })
+                .OrderByDescending(anon => anon.FatalitiesCount)
+                .Take(5)
+                .ToDictionary(anon => anon.AircraftType, anon => anon.FatalitiesCount);
 
-            foreach (var planeType in planeTypes)
-            {
-                // pocet obeti chceme pocitat pouze pro konkretni typy letadel
-                if (string.IsNullOrEmpty(planeType))
-                {
-                    continue;
-                }
-                var fatalitiesCount =
-                    DataContext.AirCrashes
-                        .Where(crash => crash.AircraftType.Equals(planeType))
-                        .Aggregate((crash1, crash2) =>
-                           new AirCrash() { Fatalities = crash1.Fatalities + crash2.Fatalities }).Fatalities;
-
-                fatalitiesPerAircraftType.Add(planeType, fatalitiesCount);
-            }
-
-            var worst50 = fatalitiesPerAircraftType
-                .OrderByDescending((pair => pair.Value)).Take(50).ToDictionary(pair => pair.Key, pair => pair.Value);
-
-            LinqHelperMethods.WriteResult(worst50, "All fatalities according to plane type greater than 100");
+            LinqHelperMethods.WriteResult(worst5, "Top 5 number of fatalities for aircraft types");
 
 
 
-            // u worst50 overte, zda vsechny zaznamy maji vice nez 100 obeti
-            var hasMoreThan100 = worst50
-                .All(pair => pair.Value > 200);
-
-            LinqHelperMethods.WriteResult(hasMoreThan100, "Are all fatalities according to plane type greater than 100: ");
-
-
-
-            // z worst50 vyberte BEZ pouziti Where() ty zaznamy, ktere maji mene nez 2000 obeti
-            var specificRange = worst50
-                .SkipWhile(pair => pair.Value > 2000)
+            // z worst5 vyberte BEZ pouziti Where() ty zaznamy, ktere maji mene nez 3000 obeti
+            var specificRange = worst5
+                .SkipWhile(pair => pair.Value > 3000)
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
 
-            LinqHelperMethods.WriteResult(specificRange, "Fatalities (less than 2000) according to plane type");
+            LinqHelperMethods.WriteResult(specificRange, "Fatalities (less than 3000) according to plane type");
 
 
 
-            // z worst50 vyberte kazdy treti typ letadla (zacnete prvnim prvkem)
-            var everyThird = worst50
+            // z worst5 vyberte kazdy druhy typ letadla (zacnete prvnim prvkem)
+            var everySecond = worst5
                 .Select(pair => pair.Key)
-                .Where((x, i) => i % 3 == 0)
+                .Where((x, i) => i % 2 == 0)
                 .ToList();
 
-            LinqHelperMethods.WriteResult(everyThird, "Every third record according to plane type");
+            LinqHelperMethods.WriteResult(everySecond, "Every second record according to plane type");
 
 
 
-            // z worst50 vyberte zaznam, na nemz se pocet obeti nejvice blizi cislu 2000
-            var closestTo2000 = worst50
-                .Aggregate((pair1, pair2) => Math.Abs(pair1.Value - 2000) < Math.Abs(pair2.Value - 2000) ? pair1 : pair2);
+            // z worst5 vyberte zaznam, na nemz se pocet obeti nejvice blizi cislu 4000
+            var closestTo4000 = worst5
+                .Aggregate((pair1, pair2) => Math.Abs(pair1.Value - 4000) < Math.Abs(pair2.Value - 4000) ? pair1 : pair2);
 
-            LinqHelperMethods.WriteResult(closestTo2000, "Fatalities according to plane type with fatalities closest to 2000: ");
+            LinqHelperMethods.WriteResult(closestTo4000, "Fatalities according to plane type with fatalities closest to 4000: ");
 
 
 
-            // z worst50 odeberte vsechny zaznamy letadel typu Douglas
-            var worst50WithoutDouglas = worst50
-                .Except(worst50.Where(pair => pair.Key.Contains("Douglas")));
+            // z worst5 odeberte vsechny zaznamy letadel typu Douglas
+            var worst5WithoutDouglas = worst5
+                .Except(worst5.Where(pair => pair.Key.Contains("Douglas")));
 
-            LinqHelperMethods.WriteResult(worst50WithoutDouglas, "Worst 50 fatalities according to plane type without all Douglas planes");
+            LinqHelperMethods.WriteResult(worst5WithoutDouglas, "Worst 5 fatalities according to plane type without all Douglas planes");
         }
 
         public static void Task06()
@@ -381,7 +363,7 @@ namespace LINQ
 
 
 
-            //pro nalezeny rok zjistete, kolik stroju od vyrobce Douglas melo nehodu
+            //pro nalezeny rok zjistete, kolik stroju od vyrobce Douglas melo v jen za tento rok nehodu
             var douglasAirCrashes =
                 DataContext.Aircrafts
                     .Where(aircraft => aircraft.Manufacturer.Contains("Douglas"))
@@ -424,9 +406,9 @@ namespace LINQ
                    crash => crash.AircraftType,
                    (aircraft, crash) => new { aircraft.Manufacturer, crash.CarrierCode })
                .Join(DataContext.Carriers,
-                   anonymousInstance => anonymousInstance.CarrierCode,
+                   anon => anon.CarrierCode,
                    carrier => carrier.Code,
-                   (anonymousInstance, carrier) => new { carrier.Name })
+                   (anon, carrier) => new { carrier.Name })
                .ToList();
 
             var carriersWithAirbusAircrash =
@@ -437,9 +419,9 @@ namespace LINQ
                    crash => crash.AircraftType,
                    (aircraft, crash) => new { aircraft.Manufacturer, crash.CarrierCode })
                .Join(DataContext.Carriers,
-                   anonymousInstance => anonymousInstance.CarrierCode,
+                   anon => anon.CarrierCode,
                    carrier => carrier.Code,
-                   (anonymousInstance, carrier) => new { carrier.Name })
+                   (anon, carrier) => new { carrier.Name })
                .ToList();
 
             var carriersUsingAirbusAndBoeingAircrafts =
