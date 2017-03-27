@@ -18,9 +18,9 @@ namespace LINQ
             // Tasks.Task01();
             // Tasks.Task02();
             // Tasks.Task03();
-            // Tasks.Task04();
-            // Tasks.Task05();
-            // Tasks.Task06();
+            // Tasks6.Task04();
+            // Tasks6.Task05();
+            // Tasks6.Task06();
         }
 
     }

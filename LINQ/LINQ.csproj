@@ -49,6 +49,7 @@
     <Compile Include="HelperMethods\LinqHelperMethods.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Tasks6.cs" />
     <Content Include="Solution.cs" />
     <Compile Include="Tasks.cs" />
   </ItemGroup>
